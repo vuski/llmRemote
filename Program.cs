@@ -10,6 +10,7 @@ if (!File.Exists(configPath))
 
 var config = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText(configPath))!;
 var port = config.TryGetValue("port", out var p) ? p.GetInt32() : 443;
+var quality = config.TryGetValue("quality", out var q) ? q.GetInt32() : 85;
 
 // Load certificate: use configured cert if available, otherwise generate self-signed
 X509Certificate2 cert;
@@ -17,12 +18,12 @@ if (config.TryGetValue("certPath", out var cp) && File.Exists(cp.GetString()))
 {
     var certPassword = config.TryGetValue("certPassword", out var pw) ? pw.GetString() ?? "" : "";
     cert = new X509Certificate2(cp.GetString()!, certPassword);
-    Console.WriteLine($"Using certificate: {cp.GetString()}");
+    LlmRemote.Services.Log.Write($"Using certificate: {cp.GetString()}");
 }
 else
 {
     cert = GenerateSelfSignedCert();
-    Console.WriteLine("Using self-signed certificate");
+    LlmRemote.Services.Log.Write("Using self-signed certificate");
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,21 +36,27 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Services.AddSingleton<AuthService>();
-builder.Services.AddSingleton<WindowService>();
+builder.Services.AddSingleton(new WindowService(quality));
 builder.Services.AddSingleton<InputService>();
 
 var app = builder.Build();
 
 app.UseWebSockets();
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+    }
+});
 
 app.MapPost("/api/login", AuthHandler.Login);
 app.MapGet("/api/windows", WindowListHandler.GetWindows);
 app.Map("/ws/stream", StreamHandler.HandleWebSocket);
 
-Console.WriteLine($"Server started on port {port} (HTTPS)");
-Console.WriteLine($"Open https://localhost:{port} in your browser");
+LlmRemote.Services.Log.Write($"Server started on port {port} (HTTPS)");
+LlmRemote.Services.Log.Write($"Open https://localhost:{port} in your browser");
 
 app.Run();
 

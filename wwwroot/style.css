@@ -122,6 +122,7 @@ body {
 /* Viewer */
 #viewer-view {
     overflow: hidden;
+    position: relative;
 }
 
 #toolbar {
@@ -148,6 +149,12 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 14px;
+}
+
+#data-usage {
+    color: #4ade80;
+    font-size: 80%;
+    white-space: nowrap;
 }
 
 #canvas-container {

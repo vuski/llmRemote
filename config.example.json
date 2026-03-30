@@ -1,5 +1,6 @@
 {
   "port": 8080,
   "certPath": "",
-  "certPassword": ""
+  "certPassword": "",
+  "quality": 85
 }

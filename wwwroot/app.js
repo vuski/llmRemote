@@ -14,11 +14,14 @@
     const textInput = document.getElementById('text-input');
     const sendBtn = document.getElementById('send-btn');
     const inputBar = document.getElementById('input-bar');
+    const dataUsage = document.getElementById('data-usage');
 
     let ws = null;
     let currentHwnd = null;
     let imageWidth = 0;
     let imageHeight = 0;
+    let totalBytes = 0;
+    let currentFps = 0;
 
     // --- Pinch zoom state ---
     let pinchStartDist = 0;
@@ -112,6 +115,9 @@
         imageHeight = w.height;
         showView(viewerView);
 
+        totalBytes = 0;
+        updateDataUsage();
+
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${proto}//${location.host}/ws/stream?hwnd=${w.hwnd}`);
 
@@ -119,12 +125,23 @@
 
         ws.onmessage = (e) => {
             if (typeof e.data === 'string') {
-                // JSON header
                 pendingHeader = JSON.parse(e.data);
+                totalBytes += e.data.length;
+                if (pendingHeader.tb) {
+                    totalBytes = pendingHeader.tb;
+                }
+                currentFps = pendingHeader.fps || 0;
+                updateDataUsage();
                 return;
             }
 
             // Binary WebP data
+            if (e.data instanceof Blob) {
+                totalBytes += e.data.size;
+            } else if (e.data instanceof ArrayBuffer) {
+                totalBytes += e.data.byteLength;
+            }
+            updateDataUsage();
             const header = pendingHeader;
             pendingHeader = null;
             if (!header) return;
@@ -371,6 +388,20 @@
     }
 
     // --- Utility ---
+    function updateDataUsage() {
+        var size;
+        if (totalBytes < 1024) {
+            size = totalBytes + ' B';
+        } else if (totalBytes < 1024 * 1024) {
+            size = (totalBytes / 1024).toFixed(1) + ' KB';
+        } else if (totalBytes < 1024 * 1024 * 1024) {
+            size = (totalBytes / (1024 * 1024)).toFixed(1) + ' MB';
+        } else {
+            size = (totalBytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        }
+        dataUsage.textContent = size;
+    }
+
     function escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;

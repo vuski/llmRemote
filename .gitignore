@@ -142,6 +142,7 @@ dist
 bin/
 obj/
 release/
+logs/
 
 # Sensitive config
 config.json

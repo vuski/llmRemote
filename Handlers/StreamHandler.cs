@@ -7,6 +7,11 @@ namespace LlmRemote.Handlers;
 
 public static class StreamHandler
 {
+    private static long _totalBytesSent;
+    private static DateTime _startTime = DateTime.UtcNow;
+
+    public static long TotalBytesSent => _totalBytesSent;
+
     public static async Task HandleWebSocket(HttpContext context, AuthService auth,
         WindowService windowService, InputService inputService)
     {
@@ -30,6 +35,9 @@ public static class StreamHandler
         }
 
         var hWnd = (IntPtr)hwndLong;
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        Log.Write($"[Stream] {ip} connected to window hwnd={hwndLong}");
+
         var ws = await context.WebSockets.AcceptWebSocketAsync();
 
         var cts = new CancellationTokenSource();
@@ -48,19 +56,35 @@ public static class StreamHandler
             }
             catch { }
         }
+
+        Log.Write($"[Stream] {ip} disconnected from window hwnd={hwndLong}");
     }
 
     private static async Task SendFrameLoop(WebSocket ws, IntPtr hWnd,
         WindowService windowService, CancellationToken ct)
     {
+        int frameCount = 0;
+        var fpsTimer = System.Diagnostics.Stopwatch.StartNew();
+
         while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
         {
             try
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var frame = windowService.CaptureWindow(hWnd);
+                sw.Stop();
                 if (frame != null)
                 {
-                    // Send header as text: {isDiff, x, y, w, h, fw, fh, size}
+                    frameCount++;
+                    var sent = frame.Data.Length;
+                    Interlocked.Add(ref _totalBytesSent, sent);
+                    var total = Interlocked.Read(ref _totalBytesSent);
+
+                    // Calculate FPS
+                    double fps = 0;
+                    if (fpsTimer.ElapsedMilliseconds > 0)
+                        fps = frameCount * 1000.0 / fpsTimer.ElapsedMilliseconds;
+
                     var header = JsonSerializer.Serialize(new
                     {
                         d = frame.IsDiff ? 1 : 0,
@@ -69,16 +93,27 @@ public static class StreamHandler
                         w = frame.Width,
                         h = frame.Height,
                         fw = frame.FullWidth,
-                        fh = frame.FullHeight
+                        fh = frame.FullHeight,
+                        tb = total,
+                        fps = Math.Round(fps, 1)
                     });
                     var headerBytes = Encoding.UTF8.GetBytes(header);
-                    await ws.SendAsync(headerBytes, WebSocketMessageType.Text, true, ct);
+                    Interlocked.Add(ref _totalBytesSent, headerBytes.Length);
 
-                    // Send WebP data as binary
+                    await ws.SendAsync(headerBytes, WebSocketMessageType.Text, true, ct);
                     await ws.SendAsync(frame.Data, WebSocketMessageType.Binary, true, ct);
+
+                    // Log + reset FPS every 5 seconds
+                    if (fpsTimer.ElapsedMilliseconds > 5000)
+                    {
+                        var totalMB = total / (1024.0 * 1024.0);
+                        Log.Write($"[Perf] {fps:F1} fps | capture: {sw.ElapsedMilliseconds}ms | total: {totalMB:F1} MB");
+                        frameCount = 0;
+                        fpsTimer.Restart();
+                    }
                 }
 
-                await Task.Delay(80, ct); // ~12fps
+                await Task.Yield();
             }
             catch (OperationCanceledException) { break; }
             catch { break; }
