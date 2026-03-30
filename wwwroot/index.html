@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>LlmRemote</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Login -->
+    <div id="login-view" class="view">
+        <form class="login-box" id="login-form" autocomplete="on">
+            <h1>LlmRemote</h1>
+            <input type="text" id="username" name="username" placeholder="Windows Username" autocapitalize="off" autocomplete="username">
+            <input type="password" id="password" name="password" placeholder="Password" autocomplete="current-password">
+            <button type="submit" id="login-btn">Login</button>
+            <div id="login-error" class="error"></div>
+        </form>
+    </div>
+
+    <!-- Window List -->
+    <div id="list-view" class="view hidden">
+        <h2>Select a Window</h2>
+        <button id="refresh-btn">Refresh</button>
+        <div id="window-list"></div>
+    </div>
+
+    <!-- Viewer -->
+    <div id="viewer-view" class="view hidden">
+        <div id="toolbar">
+            <button id="back-btn">&larr; Back</button>
+            <span id="window-title"></span>
+        </div>
+        <div id="canvas-container">
+            <canvas id="screen"></canvas>
+        </div>
+    </div>
+
+    <!-- Input bar outside viewer-view to avoid overflow:hidden issues -->
+    <div id="input-bar" class="hidden">
+        <input type="text" id="text-input" placeholder="여기에 입력 후 엔터" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text">
+        <button id="send-btn">전송</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

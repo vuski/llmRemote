@@ -134,3 +134,21 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Claude Code
+.claude/
+
+# .NET build output
+bin/
+obj/
+release/
+
+# Sensitive config
+config.json
+appsettings.*.json
+
+# Certificates
+*.pfx
+*.cer
+*.key
+*.pem
